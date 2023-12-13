@@ -20,7 +20,15 @@ namespace Api.Controllers
         [HttpGet]
         public async Task<ActionResult<IEnumerable<User>>> GetUsers()
         {
-            return await _context.Users.ToListAsync();
+            var currentUser = await _context.Users.FindAsync(User.Identity!.Name);
+
+
+            if (currentUser == null)
+            {
+                return Unauthorized();
+            }
+
+            return Ok(await _context.Users.ToListAsync());
         }
 
         // GET: api/Users/5

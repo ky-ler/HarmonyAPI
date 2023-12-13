@@ -4,6 +4,7 @@ using Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Api.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20231212160823_RemoveEmail")]
+    partial class RemoveEmail
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -116,7 +119,7 @@ namespace Api.Migrations
                     b.Property<Guid?>("MemberId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<DateTime>("UpdatedAt")
+                    b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
 
                     b.Property<string>("UserId")
@@ -153,7 +156,7 @@ namespace Api.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<DateTime>("UpdatedAt")
+                    b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("datetime2");
 
                     b.Property<string>("UserId")
@@ -208,8 +211,7 @@ namespace Api.Migrations
 
                     b.HasOne("Api.Models.Server", "Server")
                         .WithMany("Members")
-                        .HasForeignKey("ServerId")
-                        .OnDelete(DeleteBehavior.Cascade);
+                        .HasForeignKey("ServerId");
 
                     b.HasOne("Api.Models.User", "User")
                         .WithMany("Members")
@@ -245,8 +247,7 @@ namespace Api.Migrations
                 {
                     b.HasOne("Api.Models.User", "User")
                         .WithMany("Servers")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade);
+                        .HasForeignKey("UserId");
 
                     b.Navigation("User");
                 });

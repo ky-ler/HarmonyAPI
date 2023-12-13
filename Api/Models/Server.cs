@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json.Serialization;
 
 namespace Api.Models;
 
@@ -17,14 +18,17 @@ public class Server
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
-    public DateTime? UpdatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
+    [JsonIgnore]
     public string? UserId { get; set; }
 
+    [JsonIgnore]
     public User? User { get; set; }
 
     public IEnumerable<Member> Members { get; set; } = new List<Member>();
 
     public IEnumerable<Channel> Channels { get; set; } = new List<Channel>();
+
 
 }

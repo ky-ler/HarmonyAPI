@@ -27,20 +27,26 @@ namespace Api.Controllers
                 return Unauthorized();
             }
 
-            //var servers = (from member in _context.Members
-            //               where member.UserId == currentUser!.Id
-            //               select member.ServerId).ToListAsync();
-
-            var server = _context.Members
-                .Where(x => x.UserId == currentUser.Id)
-                .Select(x => x.ServerId)
+            var server = _context.Servers.Where(x => x.Members.Any(x => x.UserId == currentUser.Id)).OrderByDescending(c => c.CreatedAt)
                 .ToListAsync();
 
-            //await servers;
+            //var messages = await _context.Messages.Where(x => x.Channel.ServerId.Equals(server.Id)).ToListAsync();
+
+            foreach (var s in server.Result)
+            {
+                s.Channels = await _context.Channels.Where(x => x.ServerId.Equals(s.Id)).ToListAsync(); ;
+                s.Members = await _context.Members.Where(x => x.ServerId.Equals(s.Id)).ToListAsync();
+
+
+                //foreach (var c in s.Channels)
+                //{
+                //c.Members = await _context.Members.Where(x => x.ServerId.Equals(c.ServerId)).ToListAsync();
+
+                //c.Messages = await _context.Messages.Where(x => x.Channel.ServerId.Equals(c.ServerId)).ToListAsync(); ;
+                //}
+            }
 
             return Ok(await server);
-            //return servers;
-            //return await _context.ServerList.ToListAsync();
         }
 
         // GET: api/Servers/5
@@ -115,7 +121,18 @@ namespace Api.Controllers
             server.User = currentUser;
             server.UserId = currentUser.Id;
 
-            var newMember = new Member
+            //server.Members = new List<Member> {
+            //    new() {
+            //        User = currentUser,
+            //        UserId = currentUser.Id,
+            //        MemberRole = Member.MemberRoles.Admin,
+            //        ServerId = server.Id,
+            //        Server = server,
+            //    }
+            //};
+
+            //server.Members = new List<Member> { newMember };
+            Member member = new()
             {
                 User = currentUser,
                 UserId = currentUser.Id,
@@ -124,27 +141,33 @@ namespace Api.Controllers
                 Server = server,
             };
 
-            server.Members = new List<Member> { newMember };
+            //_context.Members.Add(member);
 
-            var newChannel = new Channel
+            Channel channel = new()
             {
                 Id = Guid.NewGuid(),
                 Name = "general",
-                Members = server.Members,
+                Members = new List<Member> { member },
                 ServerId = server.Id,
-                Server = server
+                Server = server,
+                User = currentUser,
+                UserId = currentUser.Id,
             };
+            //_context.Channels.Add(channel);
 
-            server.Channels = new List<Channel> { newChannel };
+            server.Channels = new List<Channel> { channel };
 
-            currentUser.Servers.ToList().Add(server);
-            currentUser.Channels.ToList().Add(newChannel);
+            //currentUser.Servers.ToList().Add(server);
+            //currentUser.Channels.ToList().Add(newChannel);
 
-            _context.Users.Update(currentUser);
+            //_context.Users.Update(currentUser);
             _context.Servers.Add(server);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction("GetServer", new { id = server.Id }, server);
+            return CreatedAtAction("GetServer", new
+            {
+                id = server.Id
+            }, server);
         }
 
         // DELETE: api/Servers/5
