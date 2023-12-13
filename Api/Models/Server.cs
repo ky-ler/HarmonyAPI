@@ -12,7 +12,7 @@ public class Server
     public required string Name { get; set; }
 
     [Column(TypeName = "text")]
-    public string? ImageUrl { get; set; }
+    public string ImageUrl { get; set; } = "https://via.placeholder.com/160x160";
 
     public string InviteCode { get; set; } = Guid.NewGuid().ToString();
 

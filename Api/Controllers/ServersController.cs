@@ -1,20 +1,17 @@
 ﻿using Api.Data;
 using Api.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace Api.Controllers
 {
+    [Authorize]
     [Route("api/[controller]")]
     [ApiController]
-    public class ServersController : ControllerBase
+    public class ServersController(ApplicationDbContext context) : ControllerBase
     {
-        private readonly ApplicationDbContext _context;
-
-        public ServersController(ApplicationDbContext context)
-        {
-            _context = context;
-        }
+        private readonly ApplicationDbContext _context = context;
 
         // GET: api/Servers
         [HttpGet]
@@ -30,14 +27,12 @@ namespace Api.Controllers
             var server = _context.Servers.Where(x => x.Members.Any(x => x.UserId == currentUser.Id)).OrderByDescending(c => c.CreatedAt)
                 .ToListAsync();
 
-            //var messages = await _context.Messages.Where(x => x.Channel.ServerId.Equals(server.Id)).ToListAsync();
-
             foreach (var s in server.Result)
             {
                 s.Channels = await _context.Channels.Where(x => x.ServerId.Equals(s.Id)).ToListAsync(); ;
                 s.Members = await _context.Members.Where(x => x.ServerId.Equals(s.Id)).ToListAsync();
 
-
+                // This is not needed - I will handle messages in the channels controller
                 //foreach (var c in s.Channels)
                 //{
                 //c.Members = await _context.Members.Where(x => x.ServerId.Equals(c.ServerId)).ToListAsync();
@@ -51,10 +46,28 @@ namespace Api.Controllers
 
         // GET: api/Servers/5
         [HttpGet("{id}")]
-        public async Task<ActionResult<Server>> GetServer(Guid id)
+        public async Task<ActionResult<Server>> GetServer(string id)
         {
-            var currentUser = await _context.Members.FindAsync(User.Identity!.Name);
-            var server = await _context.Servers.FindAsync(id);
+            var currentUser = await _context.Users.FindAsync(User.Identity!.Name);
+
+            if (currentUser == null)
+            {
+                return Unauthorized();
+            }
+
+            var server = await _context.Servers.FirstOrDefaultAsync(x => x.Id.ToString() == id);
+
+            if (server == null)
+            {
+                return NotFound();
+            }
+
+            var member = await _context.Members.FirstOrDefaultAsync(x => x.UserId == currentUser.Id && x.ServerId == server.Id);
+
+            if (member == null)
+            {
+                return Unauthorized();
+            }
 
             if (server == null)
             {
@@ -72,12 +85,36 @@ namespace Api.Controllers
         // PUT: api/Servers/5
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPut("{id}")]
-        public async Task<IActionResult> PutServer(Guid id, Server server)
+        public async Task<IActionResult> PutServer(Server server)
+        // Server contains Guid id - not needed
+        //public async Task<IActionResult> PutServer(Guid id, Server server)
         {
-            if (id != server.Id)
+            var currentUser = await _context.Users.FindAsync(User.Identity!.Name);
+
+            var serverFromDb = await _context.Servers.FindAsync(server.Id);
+
+            if (serverFromDb == null)
             {
-                return BadRequest();
+                return NotFound();
             }
+
+            if (currentUser == null)
+            {
+                return Unauthorized();
+            }
+
+            // Check if the user is an admin of the server
+            var member = await _context.Members.FirstOrDefaultAsync(x => x.UserId == currentUser.Id && x.ServerId == serverFromDb.Id);
+
+            if (member == null || member.MemberRole != Member.MemberRoles.Admin)
+            {
+                return Unauthorized();
+            }
+
+            //if (id != server.Id)
+            //{
+            //return BadRequest();
+            //}
 
             _context.Entry(server).State = EntityState.Modified;
 
@@ -87,7 +124,7 @@ namespace Api.Controllers
             }
             catch (DbUpdateConcurrencyException)
             {
-                if (!ServerExists(id))
+                if (!ServerExists(server.Id))
                 {
                     return NotFound();
                 }
@@ -105,12 +142,7 @@ namespace Api.Controllers
         [HttpPost]
         public async Task<ActionResult<Server>> PostServer(Server server)
         {
-            if (User.Identity == null)
-            {
-                return Unauthorized();
-            }
-
-            var currentUser = await _context.Users.FirstAsync(x => x.Id == User.Identity.Name);
+            var currentUser = await _context.Users.FirstAsync(x => x.Id == User.Identity!.Name);
 
             if (currentUser == null)
             {
@@ -121,17 +153,6 @@ namespace Api.Controllers
             server.User = currentUser;
             server.UserId = currentUser.Id;
 
-            //server.Members = new List<Member> {
-            //    new() {
-            //        User = currentUser,
-            //        UserId = currentUser.Id,
-            //        MemberRole = Member.MemberRoles.Admin,
-            //        ServerId = server.Id,
-            //        Server = server,
-            //    }
-            //};
-
-            //server.Members = new List<Member> { newMember };
             Member member = new()
             {
                 User = currentUser,
@@ -141,7 +162,7 @@ namespace Api.Controllers
                 Server = server,
             };
 
-            //_context.Members.Add(member);
+            server.Members = new List<Member> { member };
 
             Channel channel = new()
             {
@@ -153,14 +174,9 @@ namespace Api.Controllers
                 User = currentUser,
                 UserId = currentUser.Id,
             };
-            //_context.Channels.Add(channel);
 
             server.Channels = new List<Channel> { channel };
 
-            //currentUser.Servers.ToList().Add(server);
-            //currentUser.Channels.ToList().Add(newChannel);
-
-            //_context.Users.Update(currentUser);
             _context.Servers.Add(server);
             await _context.SaveChangesAsync();
 
@@ -174,10 +190,22 @@ namespace Api.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteServer(Guid id)
         {
+            var currentUser = await _context.Users.FindAsync(User.Identity!.Name);
+
+            if (currentUser == null)
+            {
+                return Unauthorized();
+            }
+
             var server = await _context.Servers.FindAsync(id);
             if (server == null)
             {
                 return NotFound();
+            }
+
+            if (server.UserId != currentUser.Id)
+            {
+                return Unauthorized();
             }
 
             _context.Servers.Remove(server);
