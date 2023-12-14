@@ -31,14 +31,6 @@ namespace Api.Controllers
             {
                 s.Channels = await _context.Channels.Where(x => x.ServerId.Equals(s.Id)).ToListAsync(); ;
                 s.Members = await _context.Members.Where(x => x.ServerId.Equals(s.Id)).ToListAsync();
-
-                // This is not needed - I will handle messages in the channels controller
-                //foreach (var c in s.Channels)
-                //{
-                //c.Members = await _context.Members.Where(x => x.ServerId.Equals(c.ServerId)).ToListAsync();
-
-                //c.Messages = await _context.Messages.Where(x => x.Channel.ServerId.Equals(c.ServerId)).ToListAsync(); ;
-                //}
             }
 
             return Ok(await server);
@@ -78,6 +70,10 @@ namespace Api.Controllers
             {
                 return Unauthorized();
             }
+
+            server.Channels = await _context.Channels.Where(x => x.ServerId.Equals(server.Id)).ToListAsync(); ;
+            server.Members = await _context.Members.Where(x => x.ServerId.Equals(server.Id)).ToListAsync();
+
 
             return server;
         }
@@ -157,6 +153,8 @@ namespace Api.Controllers
             {
                 User = currentUser,
                 UserId = currentUser.Id,
+                Username = currentUser.Username,
+                ImageUrl = currentUser.ImageUrl,
                 MemberRole = Member.MemberRoles.Admin,
                 ServerId = server.Id,
                 Server = server,
@@ -212,6 +210,53 @@ namespace Api.Controllers
             await _context.SaveChangesAsync();
 
             return NoContent();
+        }
+
+        // PATCH: api/Servers/5/invite
+        [HttpPatch("{id}/invite")]
+        public async Task<IActionResult> PatchServerInvite(string id)
+        {
+            var currentUser = await _context.Users.FindAsync(User.Identity!.Name);
+
+            if (currentUser == null)
+            {
+                return Unauthorized();
+            }
+
+            var server = await _context.Servers.FirstOrDefaultAsync(x => x.Id.ToString() == id);
+            if (server == null)
+            {
+                return NotFound();
+            }
+
+            var memberIsAdmin = await _context.Members.FirstOrDefaultAsync(x => x.UserId == currentUser.Id && x.ServerId == server.Id && x.MemberRole == Member.MemberRoles.Admin);
+
+            if (memberIsAdmin == null)
+            {
+                return Unauthorized();
+            }
+
+            server.InviteCode = Guid.NewGuid().ToString();
+
+            _context.Entry(server).State = EntityState.Modified;
+
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                if (!ServerExists(server.Id))
+                {
+                    return NotFound();
+                }
+                else
+                {
+                    throw;
+                }
+            }
+
+            return Ok(server);
         }
 
         private bool ServerExists(Guid id)

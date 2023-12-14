@@ -12,6 +12,8 @@ public class Message
     public string Content { get; set; } = null!;
 
     public string? UserId { get; set; } = null!;
+    public string? Username { get; set; }
+    public string? ImageUrl { get; set; } = "https://via.placeholder.com/160x160";
 
     [JsonIgnore]
     public User? User { get; set; }
