@@ -33,20 +33,27 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
     });
 
+//builder.Services
+//    .AddAuthorization(options =>
+//    {
+//        options.AddPolicy(
+//            "read:messages",
+//            policy => policy.Requirements.Add(
+//                new HasScopeRequirement("read:messages", domain)
+//            )
+//        );
+//    });
+
 builder.Services
-    .AddAuthorization(options =>
-    {
-        options.AddPolicy(
-            "read:messages",
-            policy => policy.Requirements.Add(
+    .AddAuthorizationBuilder()
+    .AddPolicy("read:messages", policy => policy.Requirements.Add(
                 new HasScopeRequirement("read:messages", domain)
             )
-        );
-    });
+);
 
 
 builder.Services.AddSingleton<IAuthorizationHandler, HasScopeHandler>();
-
+builder.Services.AddSingleton<IConfiguration>(config);
 
 builder.Services.AddControllers();//.AddJsonOptions(o => o.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles);
 //builder.Services.AddControllers().AddJsonOptions(o => o.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles);
