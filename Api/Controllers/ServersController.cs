@@ -47,47 +47,19 @@ namespace Api.Controllers
                 return Unauthorized();
             }
 
-            var server = await _context.Servers.FirstOrDefaultAsync(x => x.Id.ToString() == id);
+            var serverFromDb = await _context.Servers.FindAsync(Guid.Parse(id));
 
-            if (server == null)
+            if (serverFromDb == null)
             {
                 return NotFound();
             }
 
-            var member = await _context.Members.FirstOrDefaultAsync(x => x.UserId == currentUser.Id && x.ServerId == server.Id);
+            var member = await _context.Members.FirstOrDefaultAsync(x => x.UserId == currentUser.Id && x.ServerId == serverFromDb.Id);
 
             if (member == null)
             {
                 return Unauthorized();
             }
-
-            if (server == null)
-            {
-                return NotFound();
-            }
-
-            if (currentUser == null)
-            {
-                return Unauthorized();
-            }
-
-            server.Channels = await _context.Channels.Where(x => x.ServerId.Equals(server.Id)).ToListAsync(); ;
-            server.Members = await _context.Members.Where(x => x.ServerId.Equals(server.Id)).ToListAsync();
-
-
-            return server;
-        }
-
-        // PUT: api/Servers/5
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-        [HttpPut("{id}")]
-        public async Task<IActionResult> PutServer(Server server)
-        // Server contains Guid id - not needed
-        //public async Task<IActionResult> PutServer(Guid id, Server server)
-        {
-            var currentUser = await _context.Users.FindAsync(User.Identity!.Name);
-
-            var serverFromDb = await _context.Servers.FindAsync(server.Id);
 
             if (serverFromDb == null)
             {
@@ -99,20 +71,56 @@ namespace Api.Controllers
                 return Unauthorized();
             }
 
-            // Check if the user is an admin of the server
-            var member = await _context.Members.FirstOrDefaultAsync(x => x.UserId == currentUser.Id && x.ServerId == serverFromDb.Id);
+            serverFromDb.Channels = await _context.Channels.Where(x => x.ServerId.Equals(serverFromDb.Id)).ToListAsync(); ;
+            serverFromDb.Members = await _context.Members.Where(x => x.ServerId.Equals(serverFromDb.Id)).ToListAsync();
 
-            if (member == null || member.MemberRole != Member.MemberRoles.Admin)
+
+            return serverFromDb;
+        }
+
+        // Patch: api/Servers/5
+        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
+        [HttpPatch("{id}")]
+        public async Task<IActionResult> PatchServer(string id, Server server)
+        {
+            var currentUser = await _context.Users.FindAsync(User.Identity!.Name);
+
+            if (currentUser == null)
             {
                 return Unauthorized();
             }
 
-            //if (id != server.Id)
-            //{
-            //return BadRequest();
-            //}
+            var serverFromDb = await _context.Servers.FindAsync(Guid.Parse(id));
 
-            _context.Entry(server).State = EntityState.Modified;
+            if (serverFromDb == null)
+            {
+                return NotFound();
+            }
+
+            if (serverFromDb.UserId != currentUser.Id)
+            {
+                // Check if the user is an admin of the server
+                var member = await _context.Members.FirstOrDefaultAsync(x => x.UserId == currentUser.Id && x.ServerId == serverFromDb.Id);
+
+                if (member == null || member.MemberRole != Member.MemberRoles.Admin)
+                {
+                    return Unauthorized();
+                }
+            }
+
+            if (server.Name != serverFromDb.Name)
+            {
+                serverFromDb.Name = server.Name;
+            }
+
+            if (server.ImageUrl != serverFromDb.ImageUrl)
+            {
+                serverFromDb.ImageUrl = server.ImageUrl;
+            }
+
+            serverFromDb.UpdatedAt = DateTime.UtcNow;
+
+            _context.Entry(serverFromDb).State = EntityState.Modified;
 
             try
             {
@@ -120,7 +128,7 @@ namespace Api.Controllers
             }
             catch (DbUpdateConcurrencyException)
             {
-                if (!ServerExists(server.Id))
+                if (!ServerExists(Guid.Parse(id)))
                 {
                     return NotFound();
                 }
@@ -186,7 +194,7 @@ namespace Api.Controllers
 
         // DELETE: api/Servers/5
         [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteServer(Guid id)
+        public async Task<IActionResult> DeleteServer(string id)
         {
             var currentUser = await _context.Users.FindAsync(User.Identity!.Name);
 
@@ -195,18 +203,19 @@ namespace Api.Controllers
                 return Unauthorized();
             }
 
-            var server = await _context.Servers.FindAsync(id);
-            if (server == null)
+            var serverFromDb = await _context.Servers.FindAsync(Guid.Parse(id));
+
+            if (serverFromDb == null)
             {
                 return NotFound();
             }
 
-            if (server.UserId != currentUser.Id)
+            if (serverFromDb.UserId != currentUser.Id)
             {
                 return Unauthorized();
             }
 
-            _context.Servers.Remove(server);
+            _context.Servers.Remove(serverFromDb);
             await _context.SaveChangesAsync();
 
             return NoContent();
@@ -223,22 +232,25 @@ namespace Api.Controllers
                 return Unauthorized();
             }
 
-            var server = await _context.Servers.FirstOrDefaultAsync(x => x.Id.ToString() == id);
-            if (server == null)
+            var serverFromDb = await _context.Servers.FindAsync(Guid.Parse(id));
+            if (serverFromDb == null)
             {
                 return NotFound();
             }
-
-            var memberIsAdmin = await _context.Members.FirstOrDefaultAsync(x => x.UserId == currentUser.Id && x.ServerId == server.Id && x.MemberRole == Member.MemberRoles.Admin);
-
-            if (memberIsAdmin == null)
+            // check if user's id matches server's user id
+            if (serverFromDb.UserId != currentUser.Id)
             {
-                return Unauthorized();
+                var memberIsAdmin = await _context.Members.FirstOrDefaultAsync(x => x.UserId == currentUser.Id && x.ServerId == serverFromDb.Id && x.MemberRole == Member.MemberRoles.Admin);
+
+                if (memberIsAdmin == null)
+                {
+                    return Unauthorized();
+                }
             }
 
-            server.InviteCode = Guid.NewGuid().ToString();
+            serverFromDb.InviteCode = Guid.NewGuid().ToString();
 
-            _context.Entry(server).State = EntityState.Modified;
+            _context.Entry(serverFromDb).State = EntityState.Modified;
 
             try
             {
@@ -246,7 +258,7 @@ namespace Api.Controllers
             }
             catch (DbUpdateConcurrencyException)
             {
-                if (!ServerExists(server.Id))
+                if (!ServerExists(serverFromDb.Id))
                 {
                     return NotFound();
                 }
@@ -256,7 +268,7 @@ namespace Api.Controllers
                 }
             }
 
-            return Ok(server);
+            return Ok(serverFromDb);
         }
 
         private bool ServerExists(Guid id)
