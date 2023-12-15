@@ -5,15 +5,20 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Api.Controllers
 {
+
     [Route("api/[controller]")]
     [ApiController]
     public class UsersController : ControllerBase
     {
         private readonly ApplicationDbContext _context;
+        private readonly IConfiguration _config;
 
-        public UsersController(ApplicationDbContext context)
+
+
+        public UsersController(ApplicationDbContext context, IConfiguration config)
         {
             _context = context;
+            _config = config;
         }
 
         // GET: api/Users
@@ -47,21 +52,35 @@ namespace Api.Controllers
 
         // PUT: api/Users/5
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-        [HttpPut("{id}")]
+        [HttpPatch("{id}")]
         public async Task<IActionResult> PutUser(string id, User user)
         {
-            var requestUser = User.Identity?.Name;
-            if (requestUser == null || requestUser != user.Id)
+            var currentUser = await _context.Users.FirstAsync(x => x.Id == User.Identity!.Name);
+
+            if (currentUser == null)
             {
                 return Unauthorized();
             }
 
-            if (id != user.Id)
+            if (currentUser.Id != user.Id)
+            {
+                return Unauthorized();
+            }
+
+            // TODO: Allow users to change their username, email, and other fields
+            if (currentUser.ImageUrl != user.ImageUrl)
+            {
+                currentUser.ImageUrl = user.ImageUrl;
+            }
+
+
+            var res = await UpdateAuth0User(currentUser);
+            if (!res)
             {
                 return BadRequest();
             }
 
-            _context.Entry(user).State = EntityState.Modified;
+            _context.Entry(currentUser).State = EntityState.Modified;
 
             try
             {
@@ -124,6 +143,8 @@ namespace Api.Controllers
                 return NotFound();
             }
 
+            await DeleteAuth0User(user);
+
             _context.Users.Remove(user);
             await _context.SaveChangesAsync();
 
@@ -133,6 +154,30 @@ namespace Api.Controllers
         private bool UserExists(string id)
         {
             return _context.Users.Any(e => e.Id == id);
+        }
+
+        // TODO: Move this to a service
+        private async Task<bool> UpdateAuth0User(User user)
+        {
+            var client = new HttpClient();
+            var url = $"https://{_config["Auth0:Domain"]}/api/v2/users/{user.Id}";
+            var request = new HttpRequestMessage(HttpMethod.Patch, url);
+            request.Headers.Add("Accept", "application/json");
+            request.Headers.Add("Authorization", $"Bearer {_config["Auth0:ManagementToken"]}");
+            var content = new StringContent("{\"picture\":\"" + user.ImageUrl + "\"}", null, "application/json");
+            request.Content = content;
+            var response = await client.SendAsync(request);
+            return response.IsSuccessStatusCode;
+        }
+
+        private async Task<bool> DeleteAuth0User(User user)
+        {
+            var client = new HttpClient();
+            var url = $"https://{_config["Auth0:Domain"]}/api/v2/users/{user.Id}";
+            var request = new HttpRequestMessage(HttpMethod.Delete, url);
+            request.Headers.Add("Authorization", $"Bearer {_config["Auth0:ManagementToken"]}");
+            var response = await client.SendAsync(request);
+            return response.IsSuccessStatusCode;
         }
     }
 }
