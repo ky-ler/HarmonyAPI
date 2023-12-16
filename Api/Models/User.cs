@@ -8,7 +8,7 @@ public class User
 
     public string ImageUrl { get; set; } = "https://via.placeholder.com/160x160";
 
-    public IEnumerable<Server> Servers { get; set; } = new List<Server>();
-    public IEnumerable<Channel> Channels { get; set; } = new List<Channel>();
-    public IEnumerable<Member> Members { get; set; } = new List<Member>();
+    public List<Server> Servers { get; set; } = [];
+    public List<Channel> Channels { get; set; } = [];
+    public List<Member> Members { get; set; } = [];
 }

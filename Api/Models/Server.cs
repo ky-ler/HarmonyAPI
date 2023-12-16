@@ -20,15 +20,13 @@ public class Server
 
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
-    [JsonIgnore]
     public string? UserId { get; set; }
 
     [JsonIgnore]
     public User? User { get; set; }
 
-    public IEnumerable<Member> Members { get; set; } = new List<Member>();
+    public List<Member> Members { get; set; } = [];
 
-    public IEnumerable<Channel> Channels { get; set; } = new List<Channel>();
-
+    public List<Channel> Channels { get; set; } = [];
 
 }

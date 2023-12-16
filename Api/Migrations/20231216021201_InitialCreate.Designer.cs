@@ -12,8 +12,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Api.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20231212162938_AddModelBuilders")]
-    partial class AddModelBuilders
+    [Migration("20231216021201_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -65,10 +65,10 @@ namespace Api.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<Guid?>("ChannelId")
-                        .HasColumnType("uniqueidentifier");
+                    b.Property<string>("ImageUrl")
+                        .HasColumnType("nvarchar(max)");
 
-                    b.Property<DateTime>("CreatedAt")
+                    b.Property<DateTime>("JoinedAt")
                         .HasColumnType("datetime2");
 
                     b.Property<int>("MemberRole")
@@ -77,15 +77,13 @@ namespace Api.Migrations
                     b.Property<Guid?>("ServerId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("datetime2");
-
                     b.Property<string>("UserId")
                         .HasColumnType("nvarchar(450)");
 
-                    b.HasKey("Id");
+                    b.Property<string>("Username")
+                        .HasColumnType("nvarchar(max)");
 
-                    b.HasIndex("ChannelId");
+                    b.HasKey("Id");
 
                     b.HasIndex("ServerId");
 
@@ -100,7 +98,7 @@ namespace Api.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<Guid>("ChannelId")
+                    b.Property<Guid?>("ChannelId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("Content")
@@ -113,25 +111,26 @@ namespace Api.Migrations
                     b.Property<string>("FileUrl")
                         .HasColumnType("text");
 
+                    b.Property<string>("ImageUrl")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
 
                     b.Property<Guid?>("MemberId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<DateTime?>("UpdatedAt")
+                    b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("datetime2");
 
-                    b.Property<string>("UserId")
-                        .HasColumnType("nvarchar(450)");
+                    b.Property<string>("Username")
+                        .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
 
                     b.HasIndex("ChannelId");
 
                     b.HasIndex("MemberId");
-
-                    b.HasIndex("UserId");
 
                     b.ToTable("Messages");
                 });
@@ -146,6 +145,7 @@ namespace Api.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<string>("ImageUrl")
+                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<string>("InviteCode")
@@ -156,7 +156,7 @@ namespace Api.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<DateTime?>("UpdatedAt")
+                    b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("datetime2");
 
                     b.Property<string>("UserId")
@@ -176,6 +176,10 @@ namespace Api.Migrations
                 {
                     b.Property<string>("Id")
                         .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("ImageUrl")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Username")
                         .IsRequired()
@@ -205,10 +209,6 @@ namespace Api.Migrations
 
             modelBuilder.Entity("Api.Models.Member", b =>
                 {
-                    b.HasOne("Api.Models.Channel", null)
-                        .WithMany("Members")
-                        .HasForeignKey("ChannelId");
-
                     b.HasOne("Api.Models.Server", "Server")
                         .WithMany("Members")
                         .HasForeignKey("ServerId")
@@ -228,20 +228,15 @@ namespace Api.Migrations
                     b.HasOne("Api.Models.Channel", "Channel")
                         .WithMany("Messages")
                         .HasForeignKey("ChannelId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Cascade);
 
-                    b.HasOne("Api.Models.Member", null)
+                    b.HasOne("Api.Models.Member", "Member")
                         .WithMany("Messages")
                         .HasForeignKey("MemberId");
 
-                    b.HasOne("Api.Models.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId");
-
                     b.Navigation("Channel");
 
-                    b.Navigation("User");
+                    b.Navigation("Member");
                 });
 
             modelBuilder.Entity("Api.Models.Server", b =>
@@ -256,8 +251,6 @@ namespace Api.Migrations
 
             modelBuilder.Entity("Api.Models.Channel", b =>
                 {
-                    b.Navigation("Members");
-
                     b.Navigation("Messages");
                 });
 

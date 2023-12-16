@@ -29,7 +29,7 @@ namespace Api.Controllers
 
             foreach (var s in server.Result)
             {
-                s.Channels = await _context.Channels.Where(x => x.ServerId.Equals(s.Id)).ToListAsync(); ;
+                s.Channels = await _context.Channels.Where(x => x.ServerId.Equals(s.Id)).ToListAsync();
                 s.Members = await _context.Members.Where(x => x.ServerId.Equals(s.Id)).ToListAsync();
             }
 
@@ -168,20 +168,17 @@ namespace Api.Controllers
                 Server = server,
             };
 
-            server.Members = new List<Member> { member };
+            server.Members = [member];
 
             Channel channel = new()
             {
                 Id = Guid.NewGuid(),
                 Name = "general",
-                Members = new List<Member> { member },
                 ServerId = server.Id,
                 Server = server,
-                User = currentUser,
-                UserId = currentUser.Id,
             };
 
-            server.Channels = new List<Channel> { channel };
+            server.Channels = [channel];
 
             _context.Servers.Add(server);
             await _context.SaveChangesAsync();
@@ -237,6 +234,7 @@ namespace Api.Controllers
             {
                 return NotFound();
             }
+
             // check if user's id matches server's user id
             if (serverFromDb.UserId != currentUser.Id)
             {
@@ -269,6 +267,104 @@ namespace Api.Controllers
             }
 
             return Ok(serverFromDb);
+        }
+
+        // PATCH: api/servers/join/inviteCode
+        [HttpPatch("invite/{inviteCode}/accept")]
+        public async Task<IActionResult> PatchServerJoin(string inviteCode)
+        {
+            var currentUser = await _context.Users.FindAsync(User.Identity!.Name);
+
+            if (currentUser == null)
+            {
+                return Unauthorized();
+            }
+
+            // find server that invite code matches
+            var serverFromDb = await _context.Servers.FirstOrDefaultAsync(x => x.InviteCode == inviteCode);
+
+            if (serverFromDb == null)
+            {
+                return NotFound();
+            }
+
+            if (serverFromDb.InviteCode != inviteCode)
+            {
+                return Unauthorized();
+            }
+
+            var member = await _context.Members.FirstOrDefaultAsync(x => x.UserId == currentUser.Id && x.ServerId == serverFromDb.Id);
+
+            if (member != null)
+            {
+                return BadRequest();
+            }
+
+            // check if member is already in server
+            if (serverFromDb.Members.Any(x => x.UserId == currentUser.Id))
+            {
+                return BadRequest();
+            }
+
+            Member newMember = new()
+            {
+                Id = Guid.NewGuid(),
+                User = currentUser,
+                UserId = currentUser.Id,
+                Username = currentUser.Username,
+                ImageUrl = currentUser.ImageUrl,
+                MemberRole = Member.MemberRoles.Member,
+                ServerId = serverFromDb.Id,
+                Server = serverFromDb,
+
+            };
+
+            // this wasnt working
+            //_context.Entry(serverFromDb).State = EntityState.Modified;
+
+            _context.Members.Add(newMember);
+
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                if (!ServerExists(serverFromDb.Id))
+                {
+                    return NotFound();
+                }
+                else
+                {
+                    throw;
+                }
+            }
+
+            return Ok(serverFromDb);
+        }
+
+        // GET server from invite code
+        [HttpGet("invite/{inviteCode}")]
+        public async Task<IActionResult> GetServerFromInviteCode(string inviteCode)
+        {
+            var currentUser = await _context.Users.FindAsync(User.Identity!.Name);
+
+            if (currentUser == null)
+            {
+                return Unauthorized();
+            }
+
+            var serverFromDb = await _context.Servers.FirstOrDefaultAsync(x => x.InviteCode == inviteCode);
+
+            if (serverFromDb == null)
+            {
+                return NotFound();
+            }
+
+            // get member count
+            var memberCount = await _context.Members.CountAsync(x => x.ServerId == serverFromDb.Id);
+
+            return Ok(new { serverFromDb.Id, serverFromDb.Name, serverFromDb.ImageUrl, MemberCount = memberCount });
         }
 
         private bool ServerExists(Guid id)

@@ -50,12 +50,17 @@ namespace Api.Controllers
             return user;
         }
 
-        // PUT: api/Users/5
+        // PATCH: api/Users/5
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPatch("{id}")]
         public async Task<IActionResult> PutUser(string id, User user)
         {
-            var currentUser = await _context.Users.FirstAsync(x => x.Id == User.Identity!.Name);
+            if (id != User.Identity!.Name)
+            {
+                return Unauthorized();
+            }
+
+            var currentUser = await _context.Users.FindAsync(User.Identity!.Name);
 
             if (currentUser == null)
             {
@@ -73,7 +78,6 @@ namespace Api.Controllers
                 currentUser.ImageUrl = user.ImageUrl;
             }
 
-
             var res = await UpdateAuth0User(currentUser);
             if (!res)
             {
@@ -82,21 +86,16 @@ namespace Api.Controllers
 
             _context.Entry(currentUser).State = EntityState.Modified;
 
-            try
+            //await _context.SaveChangesAsync();
+
+            // update imageUrl in members
+            var members = await _context.Members.Where(x => x.UserId == currentUser.Id).ToListAsync();
+            foreach (var member in members)
             {
-                await _context.SaveChangesAsync();
+                member.ImageUrl = user.ImageUrl;
+                _context.Entry(member).State = EntityState.Modified;
             }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!UserExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
-            }
+            await _context.SaveChangesAsync();
 
             return NoContent();
         }

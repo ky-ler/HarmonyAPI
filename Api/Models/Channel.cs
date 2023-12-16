@@ -23,8 +23,7 @@ public class Channel
     [JsonIgnore]
     public Server Server { get; set; } = null!;
 
-    public IEnumerable<Member> Members { get; set; } = new List<Member>();
-    public IEnumerable<Message> Messages { get; set; } = new List<Message>();
+    public List<Message> Messages { get; set; } = [];
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;

@@ -11,16 +11,17 @@ public class Message
     [Column(TypeName = "text")]
     public string Content { get; set; } = null!;
 
-    public string? UserId { get; set; } = null!;
     public string? Username { get; set; }
     public string? ImageUrl { get; set; } = "https://via.placeholder.com/160x160";
 
     [JsonIgnore]
-    public User? User { get; set; }
+    public Guid? MemberId { get; set; }
+    [JsonIgnore]
+    public Member? Member { get; set; }
 
-    public Guid ChannelId { get; set; }
-
-    public Channel Channel { get; set; } = null!;
+    public Guid? ChannelId { get; set; }
+    [JsonIgnore]
+    public Channel? Channel { get; set; }
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;

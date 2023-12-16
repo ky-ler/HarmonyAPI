@@ -11,7 +11,6 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<Channel> Channels { get; set; } = null!;
     public DbSet<Member> Members { get; set; } = null!;
 
-
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Server>()
@@ -35,12 +34,23 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .HasPrincipalKey(u => u.Id)
             .OnDelete(DeleteBehavior.Cascade);
 
-        // not sure if i need this hehe
-        //modelBuilder.Entity<Member>().HasMany(u => u.Messages)
-        //    .WithMany(m => m.ChannelId)
-        //    .HasForeignKey(m => m.MemberId)
-        //    .HasPrincipalKey(u => u.Id)
-        //    .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<Server>()
+            .HasMany(u => u.Channels)
+            .WithOne(m => m.Server)
+            .HasForeignKey(m => m.ServerId)
+            .HasPrincipalKey(u => u.Id)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<Server>()
+            .HasIndex(s => s.InviteCode)
+            .IsUnique();
+
+        modelBuilder.Entity<Member>()
+            .HasOne(m => m.Server)
+            .WithMany(s => s.Members)
+            .HasForeignKey(m => m.ServerId)
+            .HasPrincipalKey(s => s.Id)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }
 
