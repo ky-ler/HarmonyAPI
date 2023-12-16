@@ -78,23 +78,14 @@ namespace Api.Controllers
                 currentUser.ImageUrl = user.ImageUrl;
             }
 
-            var res = await UpdateAuth0User(currentUser);
-            if (!res)
+            _context.Entry(currentUser).State = EntityState.Modified;
+
+            var updateAuth0User = await UpdateAuth0User(currentUser);
+            if (!updateAuth0User)
             {
                 return BadRequest();
             }
 
-            _context.Entry(currentUser).State = EntityState.Modified;
-
-            //await _context.SaveChangesAsync();
-
-            // update imageUrl in members
-            var members = await _context.Members.Where(x => x.UserId == currentUser.Id).ToListAsync();
-            foreach (var member in members)
-            {
-                member.ImageUrl = user.ImageUrl;
-                _context.Entry(member).State = EntityState.Modified;
-            }
             await _context.SaveChangesAsync();
 
             return NoContent();
@@ -103,9 +94,26 @@ namespace Api.Controllers
         // POST: api/Users
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPost]
-        public async Task<ActionResult<User>> PostUser(User user)
+        public async Task<ActionResult<User>> PostUser(UserDto user)
         {
-            _context.Users.Add(user);
+            // null checks for userDto
+            if (user.Id == null || user.Username == null || user.ImageUrl == null)
+            {
+                return BadRequest();
+            }
+
+            // create a new user from the userDto
+            var newUser = new User
+            {
+                Id = user.Id,
+                Username = user.Username,
+                ImageUrl = user.ImageUrl,
+                Channels = [],
+                Members = [],
+                Servers = []
+            };
+
+            _context.Users.Add(newUser);
 
             try
             {

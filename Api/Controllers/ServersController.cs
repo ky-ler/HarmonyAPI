@@ -15,7 +15,7 @@ namespace Api.Controllers
 
         // GET: api/Servers
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<Server>>> GetServerList()
+        public async Task<ActionResult<IEnumerable<ServerDto>>> GetServerList()
         {
             var currentUser = await _context.Users.FindAsync(User.Identity!.Name);
 
@@ -24,21 +24,20 @@ namespace Api.Controllers
                 return Unauthorized();
             }
 
-            var server = _context.Servers.Where(x => x.Members.Any(x => x.UserId == currentUser.Id)).OrderByDescending(c => c.CreatedAt)
-                .ToListAsync();
-
-            foreach (var s in server.Result)
+            // select all servers where user is a member while preventing object cycles
+            var s = await _context.Servers.Where(x => x.Members.Any(x => x.UserId == currentUser.Id)).Select(x => new
             {
-                s.Channels = await _context.Channels.Where(x => x.ServerId.Equals(s.Id)).ToListAsync();
-                s.Members = await _context.Members.Where(x => x.ServerId.Equals(s.Id)).ToListAsync();
-            }
+                x.Id,
+                x.Name,
+                x.ImageUrl,
+            }).ToListAsync();
 
-            return Ok(await server);
+            return Ok(s);
         }
 
         // GET: api/Servers/5
         [HttpGet("{id}")]
-        public async Task<ActionResult<Server>> GetServer(string id)
+        public async Task<IActionResult> GetServer(string id)
         {
             var currentUser = await _context.Users.FindAsync(User.Identity!.Name);
 
@@ -47,41 +46,54 @@ namespace Api.Controllers
                 return Unauthorized();
             }
 
-            var serverFromDb = await _context.Servers.FindAsync(Guid.Parse(id));
-
-            if (serverFromDb == null)
-            {
-                return NotFound();
-            }
-
-            var member = await _context.Members.FirstOrDefaultAsync(x => x.UserId == currentUser.Id && x.ServerId == serverFromDb.Id);
-
-            if (member == null)
+            //check is request user is a member of the server
+            var currentUserMember = await _context.Members.FirstOrDefaultAsync(x => x.UserId == currentUser.Id && x.ServerId == Guid.Parse(id));
+            if (currentUserMember == null)
             {
                 return Unauthorized();
             }
 
-            if (serverFromDb == null)
+
+            // select server and filter out object cycles
+            var s = await _context.Servers.Where(x => x.Id == Guid.Parse(id)).Select(x => new
+            {
+                x.Id,
+                x.Name,
+                x.ImageUrl,
+                x.UserId,
+                InviteCode = currentUserMember.MemberRole != Member.MemberRoles.Member ? x.InviteCode : null,
+                Members = x.Members.OrderBy(x => x.MemberRole).Select(x => new
+                {
+                    x.Id,
+                    x.UserId,
+                    x.User!.Username,
+                    x.User!.ImageUrl,
+                    x.MemberRole,
+                }),
+                Channels = x.Channels.Select(x => new
+                {
+                    x.Id,
+                    x.Name,
+                    x.ChannelType,
+                }),
+            }).FirstOrDefaultAsync();
+
+            if (s == null)
             {
                 return NotFound();
             }
 
-            if (currentUser == null)
-            {
-                return Unauthorized();
-            }
-
-            serverFromDb.Channels = await _context.Channels.Where(x => x.ServerId.Equals(serverFromDb.Id)).ToListAsync(); ;
-            serverFromDb.Members = await _context.Members.Where(x => x.ServerId.Equals(serverFromDb.Id)).ToListAsync();
+            //serverFromDb.Channels = await _context.Channels.Where(x => x.ServerId.Equals(serverFromDb.Id)).ToListAsync(); ;
+            //serverFromDb.Members = await _context.Members.Where(x => x.ServerId.Equals(serverFromDb.Id)).OrderBy(x => x.MemberRole).ToListAsync();
 
 
-            return serverFromDb;
+            return Ok(s);
         }
 
         // Patch: api/Servers/5
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPatch("{id}")]
-        public async Task<IActionResult> PatchServer(string id, Server server)
+        public async Task<IActionResult> PatchServer(string id, ServerDto server)
         {
             var currentUser = await _context.Users.FindAsync(User.Identity!.Name);
 
@@ -108,12 +120,12 @@ namespace Api.Controllers
                 }
             }
 
-            if (server.Name != serverFromDb.Name)
+            if (server.Name != serverFromDb.Name && server.Name != null)
             {
                 serverFromDb.Name = server.Name;
             }
 
-            if (server.ImageUrl != serverFromDb.ImageUrl)
+            if (server.ImageUrl != serverFromDb.ImageUrl && server.ImageUrl != null)
             {
                 serverFromDb.ImageUrl = server.ImageUrl;
             }
@@ -144,8 +156,14 @@ namespace Api.Controllers
         // POST: api/Servers
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPost]
-        public async Task<ActionResult<Server>> PostServer(Server server)
+        public async Task<ActionResult<ServerDto>> PostServer(ServerDto server)
         {
+            // null check name and image url
+            if (server.Name == null || server.ImageUrl == null)
+            {
+                return BadRequest();
+            }
+
             var currentUser = await _context.Users.FirstAsync(x => x.Id == User.Identity!.Name);
 
             if (currentUser == null)
@@ -153,37 +171,45 @@ namespace Api.Controllers
                 return Unauthorized();
             }
 
-            server.Id = Guid.NewGuid();
-            server.User = currentUser;
-            server.UserId = currentUser.Id;
+            // create a new server from the serverDto
+            Server newServer = new()
+            {
+                Id = Guid.NewGuid(),
+                User = currentUser,
+                UserId = currentUser.Id,
+                Name = server.Name,
+                ImageUrl = server.ImageUrl,
+                InviteCode = Guid.NewGuid().ToString(),
+                Members = [],
+                Channels = [],
+            };
 
             Member member = new()
             {
                 User = currentUser,
                 UserId = currentUser.Id,
-                Username = currentUser.Username,
-                ImageUrl = currentUser.ImageUrl,
                 MemberRole = Member.MemberRoles.Admin,
-                ServerId = server.Id,
-                Server = server,
+                ServerId = newServer.Id,
+                Server = newServer,
             };
 
-            server.Members = [member];
+            newServer.Members.Add(member);
 
             Channel channel = new()
             {
                 Id = Guid.NewGuid(),
                 Name = "general",
-                ServerId = server.Id,
-                Server = server,
+                ServerId = newServer.Id,
+                Server = newServer,
+                ChannelType = Channel.ChannelTypes.Text,
             };
 
-            server.Channels = [channel];
+            newServer.Channels = [channel];
 
-            _context.Servers.Add(server);
+            _context.Servers.Add(newServer);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction("GetServer", new
+            return CreatedAtAction("PostServer", new
             {
                 id = server.Id
             }, server);
@@ -269,9 +295,10 @@ namespace Api.Controllers
             return Ok(serverFromDb);
         }
 
+        // Accept Server Invite
         // PATCH: api/servers/join/inviteCode
         [HttpPatch("invite/{inviteCode}/accept")]
-        public async Task<IActionResult> PatchServerJoin(string inviteCode)
+        public async Task<IActionResult> AcceptServerInvite(string inviteCode)
         {
             var currentUser = await _context.Users.FindAsync(User.Identity!.Name);
 
@@ -286,11 +313,6 @@ namespace Api.Controllers
             if (serverFromDb == null)
             {
                 return NotFound();
-            }
-
-            if (serverFromDb.InviteCode != inviteCode)
-            {
-                return Unauthorized();
             }
 
             var member = await _context.Members.FirstOrDefaultAsync(x => x.UserId == currentUser.Id && x.ServerId == serverFromDb.Id);
@@ -311,16 +333,11 @@ namespace Api.Controllers
                 Id = Guid.NewGuid(),
                 User = currentUser,
                 UserId = currentUser.Id,
-                Username = currentUser.Username,
-                ImageUrl = currentUser.ImageUrl,
                 MemberRole = Member.MemberRoles.Member,
                 ServerId = serverFromDb.Id,
                 Server = serverFromDb,
 
             };
-
-            // this wasnt working
-            //_context.Entry(serverFromDb).State = EntityState.Modified;
 
             _context.Members.Add(newMember);
 

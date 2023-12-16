@@ -38,7 +38,7 @@ namespace Api.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<Guid>("ServerId")
+                    b.Property<Guid?>("ServerId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<DateTime>("UpdatedAt")
@@ -62,9 +62,6 @@ namespace Api.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<string>("ImageUrl")
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<DateTime>("JoinedAt")
                         .HasColumnType("datetime2");
 
@@ -76,9 +73,6 @@ namespace Api.Migrations
 
                     b.Property<string>("UserId")
                         .HasColumnType("nvarchar(450)");
-
-                    b.Property<string>("Username")
-                        .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
 
@@ -108,9 +102,6 @@ namespace Api.Migrations
                     b.Property<string>("FileUrl")
                         .HasColumnType("text");
 
-                    b.Property<string>("ImageUrl")
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
 
@@ -119,9 +110,6 @@ namespace Api.Migrations
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("datetime2");
-
-                    b.Property<string>("Username")
-                        .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
 
@@ -192,8 +180,7 @@ namespace Api.Migrations
                     b.HasOne("Api.Models.Server", "Server")
                         .WithMany("Channels")
                         .HasForeignKey("ServerId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Cascade);
 
                     b.HasOne("Api.Models.User", "User")
                         .WithMany("Channels")
