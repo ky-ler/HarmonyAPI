@@ -60,12 +60,15 @@ namespace Api.Controllers
                 x.Id,
                 x.Name,
                 x.ImageUrl,
-                x.UserId,
+                //x.UserId,
+                // include userId if user is admin
+                UserId = currentUserMember.MemberRole != Member.MemberRoles.Member ? x.UserId : null,
+                // include invite code if user is admin
                 InviteCode = currentUserMember.MemberRole != Member.MemberRoles.Member ? x.InviteCode : null,
                 Members = x.Members.OrderBy(x => x.MemberRole).Select(x => new
                 {
                     x.Id,
-                    x.UserId,
+                    //x.UserId, // not needed
                     x.User!.Username,
                     x.User!.ImageUrl,
                     x.MemberRole,
@@ -377,11 +380,14 @@ namespace Api.Controllers
             {
                 return NotFound();
             }
+            // 
+            // check if user is a member in the server
+            var userIsMember = await _context.Members.AnyAsync(x => x.UserId == currentUser.Id && x.ServerId == serverFromDb.Id);
 
             // get member count
             var memberCount = await _context.Members.CountAsync(x => x.ServerId == serverFromDb.Id);
 
-            return Ok(new { serverFromDb.Id, serverFromDb.Name, serverFromDb.ImageUrl, MemberCount = memberCount });
+            return Ok(new { serverFromDb.Id, serverFromDb.Name, serverFromDb.ImageUrl, MemberCount = memberCount, UserIsMember = userIsMember });
         }
 
         private bool ServerExists(Guid id)
